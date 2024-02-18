@@ -1,5 +1,5 @@
-from random import randint
-from typing import Optional, Union
+from random import choice
+from typing import Optional
 from pygame.color import THECOLORS
 
 import pygame as pg
@@ -71,7 +71,6 @@ class StartMenu:
             "snake_blue": THECOLORS["blue"],
         }
         self.current_snake = "snake_fuchsia"
-        self.current_snake_color = self.current_snake
         self.apple_rectangles = {
             "apple_red": ((260, 210), (40, 40)),
             "apple_yellow": ((330, 210), (40, 40)),
@@ -83,7 +82,6 @@ class StartMenu:
             "apple_lime": THECOLORS["lime"],
         }
         self.current_apple = "apple_red"
-        self.current_apple_color = self.current_apple
         self.difficult_rectangles = {
             "light": ((100, 330), (120, 55)),
             "medium": ((260, 330), (140, 55)),
@@ -210,8 +208,9 @@ class StartMenu:
 class GameObject:
     """Базовый класс, описывающий игровой объект."""
 
-    all_positions = set((x, y) for x in range(GRID_HEIGHT)
-                        for y in range(GRID_WIDTH))
+    all_positions = set((x * GRID_SIZE, y * GRID_SIZE)
+                        for x in range(GRID_WIDTH - 1)
+                        for y in range(GRID_HEIGHT - 1))
     taken_positions: set[tuple[int, int]] = set()
 
     def __init__(
@@ -237,10 +236,10 @@ class Apple(GameObject):
         """Метод, который устанавливает случайное положение яблока
         на игровом поле.
         """
-        self.position = (
-            randint(0, GRID_WIDTH - 1) * GRID_SIZE,
-            randint(0, GRID_HEIGHT - 1) * GRID_SIZE,
-        )
+        GameObject.taken_positions.discard(self.position)
+        self.position = choice(list(GameObject.all_positions
+                                    - GameObject.taken_positions))
+        GameObject.taken_positions.add(self.position)
 
     def draw(self, surface: pg.surface.Surface) -> None:
         """Метод для отрисовки яблока на игровом поле."""
@@ -267,10 +266,10 @@ class Rotten_apple(GameObject):
         """Метод, который устанавливает случайное положение гнилого яблока
         на игровом поле.
         """
-        self.position = (
-            randint(0, GRID_WIDTH - 1) * GRID_SIZE,
-            randint(0, GRID_HEIGHT - 1) * GRID_SIZE,
-        )
+        GameObject.taken_positions.discard(self.position)
+        self.position = choice(list(GameObject.all_positions
+                                    - GameObject.taken_positions))
+        GameObject.taken_positions.add(self.position)
 
     def draw(self, surface: pg.surface.Surface) -> None:
         """Метод для отрисовки яблока на игровом поле."""
@@ -301,6 +300,7 @@ class Snake(GameObject):
         self.positions = [CENTER]
         self.direction = RIGHT
         screen.fill(BOARD_BACKGROUND_COLOR)
+        GameObject.taken_positions.clear()
 
     def update_direction(self, direction: Optional[tuple[int, int]]) -> None:
         """Метод, который обновляет направление движения змейки"""
@@ -363,10 +363,10 @@ class Stone(GameObject):
         """Метод, который устанавливает случайное положение камня
         на игровом поле.
         """
-        self.position = (
-            randint(0, GRID_WIDTH - 1) * GRID_SIZE,
-            randint(0, GRID_HEIGHT - 1) * GRID_SIZE,
-        )
+        GameObject.taken_positions.discard(self.position)
+        self.position = choice(list(GameObject.all_positions
+                                    - GameObject.taken_positions))
+        GameObject.taken_positions.add(self.position)
 
     def draw(self, surface: pg.surface.Surface) -> None:
         """Метод для отрисовки яблока на игровом поле."""
@@ -387,6 +387,10 @@ def handle_keys(snake_object: Snake) -> None:
             snake_object.update_direction(
                 DIRECTIONS.get((event.key, snake_object.direction))
             )
+
+
+# def check_area(menu_object):
+
 
 
 def handle_mouse(area_snake, area_apple, area_difficult, menu_object):
@@ -420,32 +424,21 @@ def handle_mouse(area_snake, area_apple, area_difficult, menu_object):
                         print("Area clicked.")
 
 
-def position_check(
-    game_object1: Union[Apple, Rotten_apple], game_object2: Union[tuple | list]
-) -> None:
-    """Функция, которая проверяет положение объектов и
-    исключающая совпадение координат.
-    """
-    while game_object1.position in game_object2:
-        game_object1.randomize_position()
-
-
 def main():
     """Функция, в которой происходит основной игровой цикл."""
     start_menu = StartMenu()
     while not start_menu.start_game:
+        clock.tick(SPEED)
         start_menu.draw(screen)
         start_menu.draw_border_apple(screen)
         start_menu.draw_border_snake(screen)
         start_menu.draw_border_difficult(screen)
-        # handle_keys(snake)
         handle_mouse(
             start_menu.snake_rectangles,
             start_menu.apple_rectangles,
             start_menu.difficult_rectangles,
             start_menu,
         )
-        clock.tick(SPEED)
         pg.display.update()
     snake = Snake(start_menu.snake_colors[start_menu.current_snake])
     apple = Apple(start_menu.apple_colors[start_menu.current_apple])
@@ -458,9 +451,6 @@ def main():
         if apple.position == snake.get_head_position():
             snake.length += 1
             apple.randomize_position()
-            position_check(apple, snake.positions)
-            position_check(apple, rotten_apple.position)
-            position_check(apple, stone.position)
         if rotten_apple.position == snake.get_head_position():
             snake.length -= 1
             if snake.length >= 1:
@@ -468,15 +458,9 @@ def main():
             else:
                 snake.reset()
             rotten_apple.randomize_position()
-            position_check(rotten_apple, snake.positions)
-            position_check(rotten_apple, apple.position)
-            position_check(rotten_apple, stone.position)
         if stone.position == snake.get_head_position():
             snake.reset()
             stone.randomize_position()
-            position_check(stone, snake.positions)
-            position_check(stone, rotten_apple.position)
-            position_check(stone, apple.position)
         snake.draw(screen)
         apple.draw(screen)
         rotten_apple.draw(screen)
